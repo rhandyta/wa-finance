@@ -1,0 +1,20 @@
+{
+  "name": "wa-finance-monorepo",
+  "private": true,
+  "scripts": {
+    "setup": "npm install && npm install --prefix wa-finance-be && npm install --prefix wa-finance-fe",
+    "dev": "cross-env PORT=3000 DISABLE_BOT=1 EXPO_PUBLIC_BASE_URL=http://localhost:3000 EXPO_PUBLIC_ACCOUNT_ID=1 EXPO_PUBLIC_CURRENCY=IDR concurrently -n be,fe -c cyan,magenta \"npm --prefix wa-finance-be start\" \"npm --prefix wa-finance-fe run web -- --non-interactive\"",
+    "dev:bot": "cross-env PORT=3000 DISABLE_BOT=0 EXPO_PUBLIC_BASE_URL=http://localhost:3000 EXPO_PUBLIC_ACCOUNT_ID=1 EXPO_PUBLIC_CURRENCY=IDR concurrently -n be,fe -c cyan,magenta \"npm --prefix wa-finance-be start\" \"npm --prefix wa-finance-fe run web -- --non-interactive\"",
+    "typecheck": "npm --prefix wa-finance-fe run typecheck",
+    "test": "npm --prefix wa-finance-be test && npm --prefix wa-finance-fe run typecheck",
+    "build:web": "npm --prefix wa-finance-fe run export:web",
+    "start": "cross-env PORT=3000 DISABLE_BOT=1 npm --prefix wa-finance-be start",
+    "deploy:web": "npm run build:web && npm run start",
+    "docker:up": "cd wa-finance-be && docker compose up --build",
+    "docker:down": "cd wa-finance-be && docker compose down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3"
+  }
+}
