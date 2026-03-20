@@ -20,7 +20,7 @@ async function handleTokenShow(message, senderId) {
   try {
     const { token } = await getActiveAccountToken(senderId);
     await message.reply(
-      `🔑 Token akun kamu:\n${token}\n\nBagikan token ini kalau orang lain mau monitoring pencatatan kamu.\nMereka bisa kirim: "pakai token ${token}"`,
+      `🔑 Token akun kamu:\n${token}\n\nBagikan token ini kalau orang lain mau monitoring pencatatan kamu.\nMereka bisa monitoring akunmu dengan kirim: "pakai token ${token}"`,
     );
   } catch (error) {
     await message.reply(error.message || 'Gagal mengambil token.');
