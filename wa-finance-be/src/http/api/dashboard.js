@@ -12,7 +12,9 @@ const { requiredInt, optionalInt, optionalDate, optionalMonth, optionalCurrency 
 const router = express.Router();
 
 router.get('/summary', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const startDate = optionalDate(req.query.start) || optionalDate(req.query.startDate);
   const endDate = optionalDate(req.query.end) || optionalDate(req.query.endDate);
   if (!startDate || !endDate) return res.status(400).json({ ok: false, error: 'start/end required' });
@@ -22,7 +24,9 @@ router.get('/summary', async (req, res) => {
 });
 
 router.get('/timeseries', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const startDate = optionalDate(req.query.start) || optionalDate(req.query.startDate);
   const endDate = optionalDate(req.query.end) || optionalDate(req.query.endDate);
   if (!startDate || !endDate) return res.status(400).json({ ok: false, error: 'start/end required' });
@@ -33,7 +37,9 @@ router.get('/timeseries', async (req, res) => {
 });
 
 router.get('/by-category', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const startDate = optionalDate(req.query.start) || optionalDate(req.query.startDate);
   const endDate = optionalDate(req.query.end) || optionalDate(req.query.endDate);
   if (!startDate || !endDate) return res.status(400).json({ ok: false, error: 'start/end required' });
@@ -45,7 +51,9 @@ router.get('/by-category', async (req, res) => {
 });
 
 router.get('/by-merchant', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const startDate = optionalDate(req.query.start) || optionalDate(req.query.startDate);
   const endDate = optionalDate(req.query.end) || optionalDate(req.query.endDate);
   if (!startDate || !endDate) return res.status(400).json({ ok: false, error: 'start/end required' });
@@ -57,7 +65,9 @@ router.get('/by-merchant', async (req, res) => {
 });
 
 router.get('/budget-status', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const month = optionalMonth(req.query.month) || yyyymm(optionalDate(req.query.start));
   if (!month) return res.status(400).json({ ok: false, error: 'month required' });
   const currency = optionalCurrency(req.query.currency, 'IDR');

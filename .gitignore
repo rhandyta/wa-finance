@@ -3,7 +3,7 @@ node_modules/
 **/__pycache__/
 *.pyc
 
-wa-finance-be/.env
+.env
 wa-finance-be/public/
 wa-finance-be/.wwebjs_auth/
 wa-finance-be/.wwebjs_cache/

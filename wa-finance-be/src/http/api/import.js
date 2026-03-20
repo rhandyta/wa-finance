@@ -10,7 +10,10 @@ const router = express.Router();
 router.post('/statement', async (req, res) => {
   try {
     await ensureSchema();
-    const accountId = requiredInt(req.body?.accountId, 'accountId');
+    const accountId = Number.isFinite(req.auth?.accountId)
+      ? req.auth.accountId
+      : requiredInt(req.body?.accountId, 'accountId');
+    const actorUserId = typeof req.auth?.userId === 'string' ? req.auth.userId : null;
     const csv = req.body?.csv;
     const dryRun = !!req.body?.dryRun;
     if (!csv || typeof csv !== 'string') {
@@ -31,11 +34,11 @@ router.post('/statement', async (req, res) => {
           continue;
         }
       }
-      await insertTransaction(accountId, tx, null);
+      await insertTransaction(accountId, tx, actorUserId);
       inserted += 1;
     }
 
-    await logAudit(accountId, null, 'api_import_statement', 'account', String(accountId), {
+    await logAudit(accountId, actorUserId, 'api_import_statement', 'account', String(accountId), {
       request_id: req.requestId || null,
       inserted,
       skipped,
@@ -48,4 +51,3 @@ router.post('/statement', async (req, res) => {
 });
 
 module.exports = { importRouter: router };
-

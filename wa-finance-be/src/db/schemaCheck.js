@@ -78,23 +78,27 @@ async function listColumns(schemaName, tableName) {
 }
 
 async function checkSchema() {
-  await ensureSchema();
-  const schemaName = await getCurrentDbName();
-  if (!schemaName) return { ok: false, error: 'db_not_selected' };
+  try {
+    await ensureSchema();
+    const schemaName = await getCurrentDbName();
+    if (!schemaName) return { ok: false, error: 'db_not_selected' };
 
-  const existingTables = await listTables(schemaName);
-  const missingTables = REQUIRED.tables.filter((t) => !existingTables.includes(t));
+    const existingTables = await listTables(schemaName);
+    const missingTables = REQUIRED.tables.filter((t) => !existingTables.includes(t));
 
-  const missingColumns = {};
-  for (const [table, cols] of Object.entries(REQUIRED.columns)) {
-    if (!existingTables.includes(table)) continue;
-    const existingCols = await listColumns(schemaName, table);
-    const missing = cols.filter((c) => !existingCols.includes(c));
-    if (missing.length > 0) missingColumns[table] = missing;
+    const missingColumns = {};
+    for (const [table, cols] of Object.entries(REQUIRED.columns)) {
+      if (!existingTables.includes(table)) continue;
+      const existingCols = await listColumns(schemaName, table);
+      const missing = cols.filter((c) => !existingCols.includes(c));
+      if (missing.length > 0) missingColumns[table] = missing;
+    }
+
+    const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
+    return { ok, missingTables, missingColumns };
+  } catch (e) {
+    return { ok: false, error: e?.message || 'schema_check_failed' };
   }
-
-  const ok = missingTables.length === 0 && Object.keys(missingColumns).length === 0;
-  return { ok, missingTables, missingColumns };
 }
 
 module.exports = { checkSchema };

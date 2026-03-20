@@ -16,9 +16,10 @@ import {
 
 type AppConfig = {
   baseUrl: string;
-  apiKey: string;
-  accountId: number;
+  sessionToken: string;
   currency: string;
+  phone: string;
+  token: string;
 };
 
 type DashboardSummary = {
@@ -75,7 +76,7 @@ type DashboardData = {
   budgetStatus: BudgetStatus;
 };
 
-const CONFIG_KEY = 'wa_finance_config_v1';
+const CONFIG_KEY = 'wa_finance_config_v2';
 
 function normalizeBaseUrl(input: string) {
   const trimmed = input.trim().replace(/\/+$/, '');
@@ -145,11 +146,12 @@ async function loadConfig(): Promise<AppConfig | null> {
   try {
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
     const baseUrl = typeof parsed.baseUrl === 'string' ? normalizeBaseUrl(parsed.baseUrl) : '';
-    const apiKey = typeof parsed.apiKey === 'string' ? parsed.apiKey : '';
-    const accountId = typeof parsed.accountId === 'number' ? parsed.accountId : NaN;
+    const sessionToken = typeof parsed.sessionToken === 'string' ? parsed.sessionToken : '';
     const currency = typeof parsed.currency === 'string' ? parsed.currency : 'IDR';
-    if (!baseUrl || !apiKey || !Number.isFinite(accountId) || accountId <= 0) return null;
-    return { baseUrl, apiKey, accountId, currency };
+    const phone = typeof parsed.phone === 'string' ? parsed.phone : '';
+    const token = typeof parsed.token === 'string' ? parsed.token : '';
+    if (!baseUrl || !sessionToken) return null;
+    return { baseUrl, sessionToken, currency, phone, token };
   } catch {
     return null;
   }
@@ -174,7 +176,34 @@ async function apiGet<T>(
     url.searchParams.set(k, String(v));
   });
 
-  const res = await fetch(url.toString(), { headers: { 'x-api-key': cfg.apiKey } });
+  const res = await fetch(url.toString(), {
+    headers: { authorization: `Bearer ${cfg.sessionToken}` },
+  });
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+  if (!res.ok) {
+    const message = json?.error || json?.message || `HTTP ${res.status}`;
+    throw new Error(message);
+  }
+  if (json && typeof json === 'object' && 'ok' in json) {
+    if (!json.ok) throw new Error(json.error || 'error');
+    return json.data as T;
+  }
+  return json as T;
+}
+
+async function apiPostPublic<T>(baseUrl: string, path: string, body: any) {
+  const url = new URL(`${normalizeBaseUrl(baseUrl)}${path}`);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  });
   const text = await res.text();
   let json: any = null;
   try {
@@ -195,7 +224,6 @@ async function apiGet<T>(
 
 async function fetchDashboard(cfg: AppConfig, startDate: string, endDate: string, monthKey: string) {
   const common = {
-    accountId: cfg.accountId,
     start: startDate,
     end: endDate,
     currency: cfg.currency,
@@ -206,7 +234,6 @@ async function fetchDashboard(cfg: AppConfig, startDate: string, endDate: string
     apiGet<BreakdownByCategory>(cfg, '/api/dashboard/by-category', { ...common, type: 'OUT', limit: 10 }),
     apiGet<BreakdownByMerchant>(cfg, '/api/dashboard/by-merchant', { ...common, type: 'OUT', limit: 10 }),
     apiGet<BudgetStatus>(cfg, '/api/dashboard/budget-status', {
-      accountId: cfg.accountId,
       month: monthKey,
       currency: cfg.currency,
     }),
@@ -342,15 +369,16 @@ function LoginScreen({ onLogin }: { onLogin: (cfg: AppConfig) => Promise<void> }
     }
     return 'http://localhost:3000';
   })();
-  const defaultApiKey = (process.env.EXPO_PUBLIC_API_KEY || '').trim();
-  const defaultAccountId = (process.env.EXPO_PUBLIC_ACCOUNT_ID || '1').trim();
-  const defaultCurrency = (process.env.EXPO_PUBLIC_CURRENCY || 'IDR').trim().toUpperCase();
-
-  const [baseUrl, setBaseUrl] = useState(defaultBaseUrl);
-  const [apiKey, setApiKey] = useState(defaultApiKey);
-  const [accountId, setAccountId] = useState(defaultAccountId);
-  const [currency, setCurrency] = useState(defaultCurrency);
-  const [saving, setSaving] = useState(false);
+  const baseUrl = normalizeBaseUrl(defaultBaseUrl);
+  const [phone, setPhone] = useState('');
+  const [token, setToken] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const canSendOtp = !sendingOtp && !verifying && !!phone.trim() && !!token.trim();
+  const canVerify =
+    !sendingOtp && !verifying && !!phone.trim() && !!token.trim() && /^\d{6}$/.test(otp.trim());
 
   return (
     <ScrollView contentContainerStyle={{ padding: 18, gap: 12 }}>
@@ -358,100 +386,132 @@ function LoginScreen({ onLogin }: { onLogin: (cfg: AppConfig) => Promise<void> }
       <Text style={styles.muted}>Masuk untuk mengambil data dashboard dari wa-finance-be.</Text>
 
       <View style={styles.card}>
-        <Text style={styles.label}>Base URL Backend</Text>
+        <Text style={styles.label}>Nomor HP WhatsApp</Text>
         <TextInput
-          value={baseUrl}
-          onChangeText={setBaseUrl}
+          value={phone}
+          onChangeText={setPhone}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder="http://localhost:3000"
+          keyboardType={Platform.OS === 'ios' ? 'phone-pad' : 'phone-pad'}
+          placeholder="contoh: 081234567890"
           placeholderTextColor="#6070a4"
           style={styles.input}
         />
 
         <View style={{ height: 12 }} />
 
-        <Text style={styles.label}>API Key (header x-api-key)</Text>
+        <Text style={styles.label}>Token Akun</Text>
         <TextInput
-          value={apiKey}
-          onChangeText={setApiKey}
+          value={token}
+          onChangeText={setToken}
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
-          placeholder="change-me"
+          placeholder="token dari WhatsApp bot"
           placeholderTextColor="#6070a4"
           style={styles.input}
         />
-
-        <View style={{ height: 12 }} />
-
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Account ID</Text>
-            <TextInput
-              value={accountId}
-              onChangeText={setAccountId}
-              keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
-              placeholder="1"
-              placeholderTextColor="#6070a4"
-              style={styles.input}
-            />
-          </View>
-          <View style={{ width: 120 }}>
-            <Text style={styles.label}>Currency</Text>
-            <TextInput
-              value={currency}
-              onChangeText={(v) => setCurrency(v.toUpperCase())}
-              autoCapitalize="characters"
-              placeholder="IDR"
-              placeholderTextColor="#6070a4"
-              style={styles.input}
-            />
-          </View>
-        </View>
 
         <View style={{ height: 14 }} />
 
         <Button
-          title={saving ? 'Memproses…' : 'Masuk'}
-          disabled={saving}
+          title={sendingOtp ? 'Mengirim…' : 'Kirim OTP WhatsApp'}
+          disabled={!canSendOtp}
           onPress={async () => {
-            const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
-            const parsedAccountId = parseInt(accountId, 10);
-            if (!normalizedBaseUrl) {
-              Alert.alert('Validasi', 'Base URL wajib diisi.');
+            if (!baseUrl) {
+              Alert.alert('Konfigurasi', 'Base URL belum tersedia.');
               return;
             }
-            if (!normalizedBaseUrl.startsWith('http://') && !normalizedBaseUrl.startsWith('https://')) {
-              Alert.alert('Validasi', 'Base URL harus diawali http:// atau https://');
+            if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+              Alert.alert('Konfigurasi', 'Base URL tidak valid.');
               return;
             }
-            if (!apiKey.trim()) {
-              Alert.alert('Validasi', 'API Key wajib diisi.');
+            if (!phone.trim()) {
+              Alert.alert('Validasi', 'Nomor HP wajib diisi.');
               return;
             }
-            if (!Number.isFinite(parsedAccountId) || parsedAccountId <= 0) {
-              Alert.alert('Validasi', 'Account ID harus angka > 0.');
+            if (!token.trim()) {
+              Alert.alert('Validasi', 'Token wajib diisi.');
               return;
             }
-            if (!/^[A-Z]{3}$/.test(currency.trim().toUpperCase())) {
-              Alert.alert('Validasi', 'Currency harus 3 huruf, misal: IDR, USD.');
-              return;
-            }
-
-            const cfg: AppConfig = {
-              baseUrl: normalizedBaseUrl,
-              apiKey: apiKey.trim(),
-              accountId: parsedAccountId,
-              currency: currency.trim().toUpperCase(),
-            };
-
-            setSaving(true);
+            setSendingOtp(true);
             try {
+              await apiPostPublic<{ sent: true }>(baseUrl, '/api/auth/request-otp', {
+                phone: phone.trim(),
+                token: token.trim(),
+              });
+              setOtpSent(true);
+              Alert.alert('OTP terkirim', 'Cek WhatsApp kamu untuk kode OTP.');
+            } catch (e: any) {
+              Alert.alert('Gagal kirim OTP', e?.message || 'Gagal');
+            } finally {
+              setSendingOtp(false);
+            }
+          }}
+        />
+
+        <View style={{ height: 12 }} />
+
+        <Text style={styles.label}>Kode OTP</Text>
+        <TextInput
+          value={otp}
+          onChangeText={setOtp}
+          keyboardType={Platform.OS === 'ios' ? 'number-pad' : 'numeric'}
+          placeholder="6 digit"
+          placeholderTextColor="#6070a4"
+          style={styles.input}
+        />
+
+        <View style={{ height: 14 }} />
+
+        <Button
+          title={verifying ? 'Memproses…' : 'Verifikasi & Masuk'}
+          disabled={!canVerify}
+          onPress={async () => {
+            if (!baseUrl) {
+              Alert.alert('Konfigurasi', 'Base URL belum tersedia.');
+              return;
+            }
+            if (!phone.trim()) {
+              Alert.alert('Validasi', 'Nomor HP wajib diisi.');
+              return;
+            }
+            if (!token.trim()) {
+              Alert.alert('Validasi', 'Token wajib diisi.');
+              return;
+            }
+            if (!/^\d{6}$/.test(otp.trim())) {
+              Alert.alert('Validasi', 'OTP harus 6 digit.');
+              return;
+            }
+            if (!otpSent) {
+              Alert.alert('Validasi', 'Klik "Kirim OTP WhatsApp" dulu.');
+              return;
+            }
+
+            setVerifying(true);
+            try {
+              const result = await apiPostPublic<{ sessionToken: string; currency: string }>(
+                baseUrl,
+                '/api/auth/verify-otp',
+                {
+                  phone: phone.trim(),
+                  token: token.trim(),
+                  otp: otp.trim(),
+                },
+              );
+
+              const cfg: AppConfig = {
+                baseUrl,
+                sessionToken: result.sessionToken,
+                currency: (result.currency || 'IDR').toUpperCase(),
+                phone: phone.trim(),
+                token: token.trim(),
+              };
+
               const today = new Date();
               const start = new Date(today.getFullYear(), today.getMonth(), 1);
               await apiGet<DashboardSummary>(cfg, '/api/dashboard/summary', {
-                accountId: cfg.accountId,
                 start: formatDateYyyyMmDd(start),
                 end: formatDateYyyyMmDd(today),
                 currency: cfg.currency,
@@ -460,7 +520,7 @@ function LoginScreen({ onLogin }: { onLogin: (cfg: AppConfig) => Promise<void> }
             } catch (e: any) {
               Alert.alert('Gagal login', e?.message || 'Gagal');
             } finally {
-              setSaving(false);
+              setVerifying(false);
             }
           }}
         />
@@ -469,7 +529,7 @@ function LoginScreen({ onLogin }: { onLogin: (cfg: AppConfig) => Promise<void> }
       <View style={styles.card}>
         <Text style={styles.label}>Catatan</Text>
         <Text style={styles.muted}>
-          Endpoint /api/* di backend hanya aktif jika env HTTP_API_KEY diset, dan request wajib membawa header x-api-key.
+          OTP dikirim lewat WhatsApp dari bot. Pastikan bot sudah login (QR sudah discan) di server.
         </Text>
       </View>
     </ScrollView>
@@ -519,7 +579,7 @@ function DashboardScreen({ config, onLogout }: { config: AppConfig; onLogout: ()
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Dashboard</Text>
           <Text style={styles.muted}>
-            Account {config.accountId} • {range.startDate} s/d {range.endDate} • {config.currency}
+            {config.phone} • {range.startDate} s/d {range.endDate} • {config.currency}
           </Text>
         </View>
         <View style={styles.row}>

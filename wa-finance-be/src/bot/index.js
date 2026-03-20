@@ -20,6 +20,7 @@ const merchant = require('./merchant');
 const { extractInteractiveId } = require('./interactive');
 
 const attemptBuckets = new Map();
+let sharedClient = null;
 
 function allowAttempt(bucketKey, limit, windowMs) {
   const now = Date.now();
@@ -375,9 +376,14 @@ function createBot() {
 function startBot() {
   console.log('Starting WhatsApp client...');
   const client = createBot();
+  sharedClient = client;
   client.initialize();
   console.log('Initializing client...');
   return client;
 }
 
-module.exports = { startBot };
+function getBotClient() {
+  return sharedClient;
+}
+
+module.exports = { startBot, getBotClient };

@@ -5,7 +5,9 @@ const { requiredInt, optionalInt, optionalBool, optionalDate, optionalCurrency }
 const router = express.Router();
 
 router.get('/', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const startDate = req.query.start ? optionalDate(req.query.start) : null;
   const endDate = req.query.end ? optionalDate(req.query.end) : null;
   const type = req.query.type ? String(req.query.type) : null;
@@ -26,7 +28,9 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
-  const accountId = requiredInt(req.query.accountId, 'accountId');
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
   const currency = req.query.currency ? optionalCurrency(req.query.currency, null) : null;
   const data = await getTransactionDetail(accountId, req.params.id, currency);
   if (!data) return res.status(404).json({ ok: false, error: 'not_found' });

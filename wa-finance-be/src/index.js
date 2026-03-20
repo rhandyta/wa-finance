@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+const dotenv = require('dotenv');
 const { createApp } = require('./http/app');
 const { registerRoutes } = require('./http/routes');
 const { startBot } = require('./bot');
@@ -5,6 +8,9 @@ const { runDueRecurringAll, ensureSchema } = require('./db');
 const { logger } = require('./logger');
 const { runReceiptRetention } = require('./jobs/receiptRetention');
 const { checkSchema } = require('./db/schemaCheck');
+
+const rootEnvPath = path.resolve(__dirname, '../../.env');
+if (fs.existsSync(rootEnvPath)) dotenv.config({ path: rootEnvPath });
 
 function startHttpServer() {
   const port = parseInt(process.env.PORT || '3000', 10);

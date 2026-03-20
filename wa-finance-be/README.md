@@ -38,13 +38,13 @@ Project ini adalah bot WhatsApp yang berfungsi sebagai asisten keuangan pribadi.
     - Impor skema tabel dengan menjalankan isi dari file `setup.sql` di database Anda. Skema akan membuat tabel `transactions`, `transaction_items`, `user_settings`, `accounts`/`account_members`, `account_invites`, `audit_logs`, `budgets`, dan `recurring_rules`.
 
 4.  **Konfigurasi Environment**
-    - Salin file `.env.example` menjadi file baru bernama `.env`.
+    - Gunakan file `.env.example` di root repo (folder paling atas) dan buat file `.env` di root repo.
       ```bash
       # Di Windows
-      copy .env.example .env
+      copy ..\.env.example ..\.env
       
       # Di macOS/Linux
-      cp .env.example .env
+      cp ../.env.example ../.env
       ```
     - Buka file `.env` dan isi semua nilai yang diperlukan:
       - `DB_HOST`: Alamat host database Anda.
