@@ -80,12 +80,7 @@ function createApp({ apiKey } = {}) {
       return false;
     }
 
-    return (
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin) ||
-      /^https?:\/\/(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(:\d+)?$/i.test(
-        origin,
-      )
-    );
+    return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
   };
 
   app.locals.cors = {
@@ -129,6 +124,16 @@ function createApp({ apiKey } = {}) {
   );
 
   app.use(
+    '/api/auth',
+    rateLimit({
+      windowMs: 60 * 1000,
+      limit: 10,
+      standardHeaders: true,
+      legacyHeaders: false,
+    }),
+  );
+
+  app.use(
     '/api',
     rateLimit({
       windowMs: 60 * 1000,
@@ -150,7 +155,26 @@ function createApp({ apiKey } = {}) {
 
   app.use(express.json({ limit: '256kb' }));
 
+  const pruneAuthCaches = () => {
+    const now = Date.now();
+    const last = app.locals.auth.lastPruneAt || 0;
+    if (now - last < 60 * 1000) return;
+    app.locals.auth.lastPruneAt = now;
+
+    for (const [key, value] of app.locals.auth.otpByKey.entries()) {
+      if (!value || !value.expiresAt || now > value.expiresAt) {
+        app.locals.auth.otpByKey.delete(key);
+      }
+    }
+    for (const [key, value] of app.locals.auth.sessionByToken.entries()) {
+      if (!value || !value.expiresAt || now > value.expiresAt) {
+        app.locals.auth.sessionByToken.delete(key);
+      }
+    }
+  };
+
   app.use((req, res, next) => {
+    pruneAuthCaches();
     const start = process.hrtime.bigint();
     const requestId = crypto.randomUUID();
     req.requestId = requestId;

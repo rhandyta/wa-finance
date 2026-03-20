@@ -1,6 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
-const { joinAccountByToken, getUserCurrency } = require('../../db');
+const { joinAccountByToken, getUserCurrency, resolveAccountIdByJoinToken } = require('../../db');
 const { getBotClient } = require('../../bot');
 const { dashboardRouter } = require('./dashboard');
 const { transactionsRouter } = require('./transactions');
@@ -48,6 +48,14 @@ router.post('/auth/request-otp', async (req, res) => {
   const client = getBotClient();
   if (!client) return res.status(503).json({ ok: false, error: 'whatsapp not ready' });
 
+  const accountId = await resolveAccountIdByJoinToken(token);
+  if (!Number.isFinite(accountId) || accountId <= 0) {
+    return res.status(400).json({ ok: false, error: 'token invalid' });
+  }
+
+  const okGlobal = allowAttempt(req.app.locals.auth.otpAttemptsByKey, `otp:global`, 20, 60 * 1000);
+  if (!okGlobal) return res.status(429).json({ ok: false, error: 'too_many_requests' });
+
   const attemptKey = `otp:${chatId}`;
   const okAttempt = allowAttempt(req.app.locals.auth.otpAttemptsByKey, attemptKey, 3, 10 * 60 * 1000);
   if (!okAttempt) return res.status(429).json({ ok: false, error: 'too_many_requests' });
@@ -62,6 +70,13 @@ router.post('/auth/request-otp', async (req, res) => {
   });
 
   try {
+    const lastSendAt = req.app.locals.auth.lastOtpSendAt || 0;
+    const gapMs = 1500;
+    const now = Date.now();
+    const waitMs = now - lastSendAt < gapMs ? gapMs - (now - lastSendAt) : 0;
+    if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+    req.app.locals.auth.lastOtpSendAt = Date.now();
+
     await client.sendMessage(chatId, `Kode OTP dashboard: ${otp}\nBerlaku 5 menit.`);
     return res.json({ ok: true, data: { sent: true } });
   } catch {

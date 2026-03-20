@@ -112,6 +112,9 @@ function createBot() {
     inc('bot_messages', 1);
     await dbReady;
 
+    const okMsgRate = allowAttempt(`${senderId}:msg`, 25, 30 * 1000);
+    if (!okMsgRate) return;
+
     let rawMessageBody = message.body
       .replace(/@\d+/g, '')
       .replace(/\s\s+/g, ' ')

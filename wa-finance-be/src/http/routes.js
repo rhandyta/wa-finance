@@ -70,6 +70,11 @@ async function checkPythonEasyOcrCached() {
 }
 
 function registerRoutes(app) {
+  const isLocalIp = (ip) => {
+    const raw = String(ip || '').trim().toLowerCase();
+    return raw === '127.0.0.1' || raw === '::1' || raw === '::ffff:127.0.0.1';
+  };
+
   app.get('/health', async (req, res) => {
     const [db, python, schema] = await Promise.all([checkDb(), checkPythonEasyOcrCached(), checkSchema()]);
     const ok = db.ok && python.ok && schema.ok;
@@ -83,15 +88,15 @@ function registerRoutes(app) {
   app.use('/api', apiRouter);
 
   app.get('/debug/config', (req, res) => {
-    logger.info('debug_config', { hasApiKey: !!process.env.HTTP_API_KEY });
+    if (!isLocalIp(req.ip)) return res.status(404).end();
     res.json({
       ok: true,
       hasApiKey: !!process.env.HTTP_API_KEY,
-      apiKeyLength: String(process.env.HTTP_API_KEY || '').length,
     });
   });
 
   app.get('/debug/cors', (req, res) => {
+    if (!isLocalIp(req.ip)) return res.status(404).end();
     const origin = req.header('origin') || null;
     const cors = req.app?.locals?.cors || null;
     const allowed = Array.isArray(cors?.allowed) ? cors.allowed : cors?.allowed || null;

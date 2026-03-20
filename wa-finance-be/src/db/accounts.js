@@ -150,6 +150,29 @@ async function rotateActiveAccountToken(userId) {
   return { accountId, token };
 }
 
+async function resolveAccountIdByJoinToken(token) {
+  await ensureSchema();
+  const t = String(token || '').trim();
+  if (!t) return null;
+
+  const [inviteRows] = await pool.execute(
+    `SELECT account_id
+     FROM account_invites
+     WHERE invite_token = ?
+       AND revoked_at IS NULL
+       AND used_at IS NULL
+       AND (expires_at IS NULL OR expires_at > NOW())
+     LIMIT 1`,
+    [t],
+  );
+  if (inviteRows.length > 0) return inviteRows[0].account_id;
+
+  const [rows] = await pool.execute(`SELECT id FROM accounts WHERE share_token = ? LIMIT 1`, [t]);
+  if (rows.length > 0) return rows[0].id;
+
+  return null;
+}
+
 async function joinAccountByToken(userId, token) {
   await ensureSchema();
   await ensureUserSettingsRow(userId);
@@ -354,6 +377,7 @@ module.exports = {
   getActiveAccountContext,
   getActiveAccountToken,
   rotateActiveAccountToken,
+  resolveAccountIdByJoinToken,
   joinAccountByToken,
   createAccountAndSetActive,
   listUserAccounts,
