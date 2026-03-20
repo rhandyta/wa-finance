@@ -1,6 +1,7 @@
 const {
   getActiveAccountToken,
   rotateActiveAccountToken,
+  getActiveAccountContext,
   joinAccountByToken,
   listUserAccounts,
   setActiveAccount,
@@ -12,6 +13,8 @@ const {
   listMembers,
   revokeMember,
 } = require('../db');
+
+const monitorReturnAccountByUser = new Map();
 
 async function handleTokenShow(message, senderId) {
   try {
@@ -41,6 +44,12 @@ async function handleJoinToken(message, senderId, token) {
     return;
   }
   try {
+    if (!monitorReturnAccountByUser.has(senderId)) {
+      const ctx = await getActiveAccountContext(senderId);
+      if (ctx && ctx.canWrite) {
+        monitorReturnAccountByUser.set(senderId, ctx.accountId);
+      }
+    }
     await joinAccountByToken(senderId, token);
     await message.reply(
       '✅ Berhasil masuk ke akun tersebut. Kamu sekarang mode monitoring (read-only). Kirim "monitor off" untuk kembali ke akun kamu.',
@@ -51,11 +60,18 @@ async function handleJoinToken(message, senderId, token) {
 }
 
 async function handleMonitorOff(message, senderId) {
+  const returnTo = monitorReturnAccountByUser.get(senderId) || null;
   try {
-    await switchToOwnedAccount(senderId);
+    if (Number.isFinite(returnTo) && returnTo > 0) {
+      await setActiveAccount(senderId, returnTo);
+    } else {
+      await switchToOwnedAccount(senderId);
+    }
     await message.reply('✅ Kembali ke akun kamu.');
   } catch (error) {
     await message.reply(error.message || 'Gagal kembali ke akun kamu.');
+  } finally {
+    monitorReturnAccountByUser.delete(senderId);
   }
 }
 

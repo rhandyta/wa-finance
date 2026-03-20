@@ -91,6 +91,21 @@ function registerRoutes(app) {
     });
   });
 
+  app.get('/debug/cors', (req, res) => {
+    const origin = req.header('origin') || null;
+    const cors = req.app?.locals?.cors || null;
+    const allowed = Array.isArray(cors?.allowed) ? cors.allowed : cors?.allowed || null;
+    const isAllowed = typeof cors?.isAllowedOrigin === 'function' ? !!cors.isAllowedOrigin(origin) : null;
+    res.json({
+      ok: true,
+      origin,
+      isAllowed,
+      configuredAllowList: allowed,
+      hint:
+        'Pastikan Origin di browser sama persis dengan CORS_ALLOW_ORIGINS (atau pakai wildcard seperti http://localhost:*), lalu restart backend.',
+    });
+  });
+
   const publicDir = path.join(__dirname, '..', '..', 'public');
   const webDir = path.join(publicDir, 'web');
   const webIndexPath = path.join(webDir, 'index.html');

@@ -88,6 +88,11 @@ function createApp({ apiKey } = {}) {
     );
   };
 
+  app.locals.cors = {
+    allowed: corsAllowed,
+    isAllowedOrigin,
+  };
+
   app.use((req, res, next) => {
     const origin = req.header('origin');
     if (!origin) return next();
