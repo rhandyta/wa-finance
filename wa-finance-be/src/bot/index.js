@@ -132,32 +132,16 @@ function createBot() {
       hasMedia: !!message.hasMedia,
     });
 
+    const isGroup = isGroupChatId(senderId);
+    if (isGroup) return;
+
+    // Commands that should only be used in private chat are ignored in groups
+    // (no reply sent to avoid spamming the group)
+
     const currentState = getUserState(senderId);
     if (currentState?.step === 'awaiting_tx_confirmation') {
       await tx.handlePendingTransactionMessage(message, senderId, messageBody, rawMessageBody);
       return;
-    }
-
-    const isGroup = isGroupChatId(senderId);
-    const sensitiveInGroup = [
-      'token',
-      'token saya',
-      'token reset',
-      'reset token',
-      'invite',
-      'akses',
-      'export',
-      'struk terakhir',
-      'lihat struk terakhir',
-      'kategori',
-      'merchant',
-    ];
-    if (isGroup) {
-      const matched = sensitiveInGroup.some((p) => messageBody === p || messageBody.startsWith(`${p} `));
-      if (matched) {
-        await message.reply('Perintah ini hanya bisa dipakai lewat chat pribadi.');
-        return;
-      }
     }
 
     const getCtx = async (requireWrite = false) => {
