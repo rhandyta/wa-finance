@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: wa_finance
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - wa-finance-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  backend:
+    build:
+      context: ./wa-finance-be
+      dockerfile: Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: wa_finance
+      HTTP_API_KEY: ${HTTP_API_KEY:-change-me}
+      OCR_TIMEOUT_MS: 120000
+      PYTHON_BIN: python3
+      CORS_ALLOW_ORIGINS: http://localhost:19006,http://localhost:3000,http://frontend:19006,http://localhost,http://frontend
+      EXPO_PUBLIC_BASE_URL: http://backend:3000
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      AUTH_OTP_SECRET: ${AUTH_OTP_SECRET:-}
+      RECEIPT_RETENTION_DAYS: ${RECEIPT_RETENTION_DAYS:-}
+      DISABLE_BOT: ${DISABLE_BOT:-0}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./wa-finance-be:/app
+      - /app/node_modules
+    networks:
+      - wa-finance-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./wa-finance-fe
+      dockerfile: Dockerfile
+      args:
+        EXPO_PUBLIC_BASE_URL: http://backend:3000
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - wa-finance-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  wa-finance-network:
+    driver: bridge
