@@ -4,8 +4,15 @@ const { formatMoney } = require('../utils');
 async function handleBudget(message, senderId, accountId, rawMessageBody, canWrite) {
   const parts = rawMessageBody.trim().split(/\s+/);
   const cmd = (parts[1] || '').toLowerCase();
-  const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  
+  let targetDate = new Date();
+  const isNext = parts.some(p => /^(next|depan)$/i.test(p));
+  if (isNext) {
+    // Set to 1st to avoid overflow if today is 31st and next month has 30 days
+    targetDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1);
+  }
+
+  const monthKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}`;
   const userCurrency = await getUserCurrency(senderId);
 
   if (cmd === 'set') {
@@ -13,7 +20,11 @@ async function handleBudget(message, senderId, accountId, rawMessageBody, canWri
       await message.reply('Mode monitoring tidak bisa set budget. Kirim "monitor off" dulu.');
       return;
     }
-    const tail = rawMessageBody.replace(/^budget\s+set\s+/i, '').trim();
+    const tail = rawMessageBody
+      .replace(/^budget\s+set\s+/i, '')
+      .replace(/\s+(next|depan)(\s+|$)/i, ' ')
+      .replace(/^(next|depan)\s+/i, '')
+      .trim();
     const m = tail.match(/^(.*)\s+(\d[\d.,]*)$/);
     if (!m) {
       await message.reply('Format: "budget set <kategori> <jumlah>"');
@@ -31,12 +42,12 @@ async function handleBudget(message, senderId, accountId, rawMessageBody, canWri
   }
 
   if (cmd === 'list' || cmd === 'status' || cmd === '') {
-    const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    const startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1).toISOString().slice(0, 10);
+    const endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).toISOString().slice(0, 10);
     const budgets = await listMonthlyBudgets(accountId, monthKey);
     const spend = await getSpendingByCategory(accountId, startDate, endDate, userCurrency);
     if (budgets.length === 0) {
-      await message.reply('Belum ada budget bulan ini. Contoh: "budget set Makan 1500000"');
+      await message.reply(`Belum ada budget untuk ${isNext ? 'bulan depan ' : ''}(${monthKey}). Contoh: "budget set Makan 1500000"`);
       return;
     }
     let txt = `📌 *Budget (${monthKey})*\n\n`;
@@ -50,7 +61,7 @@ async function handleBudget(message, senderId, accountId, rawMessageBody, canWri
     return;
   }
 
-  await message.reply('Perintah budget: "budget set <kategori> <jumlah>" atau "budget list"');
+  await message.reply('Perintah budget: "budget set <kategori> <jumlah> [next/depan]" atau "budget list [next/depan]"');
 }
 
 module.exports = { handleBudget };

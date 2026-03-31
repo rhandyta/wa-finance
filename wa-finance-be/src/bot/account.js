@@ -236,7 +236,7 @@ async function handleHelp(message, canWrite) {
   if (canWrite) {
     txt += `- kirim teks transaksi atau foto struk\n- undo / batal\n- undo kembali\n- edit transaksi terakhir jumlah <angka>\n- set currency <IDR|USD|EUR>\n\n`;
     txt += `Template koreksi sebelum simpan:\n- ubah transaksi 1 jumlah 50000\n- ubah transaksi 1 kategori Makan\n- ubah transaksi 1 item tambah Ayam 1 25000\n- ubah transaksi 1 item ubah 1 2 20000\n- ubah transaksi 1 item hapus 1\n\n`;
-    txt += `- budget set <kategori> <jumlah>\n- budget list\n\n`;
+    txt += `- budget set <kategori> <jumlah> [next/depan]\n- budget list [next/depan]\n\n`;
     txt += `- ulang tambah <in|out> <jumlah> <kategori> ; <keterangan> ; <tgl 1-28>\n- ulang list\n- ulang hapus <id>\n\n`;
     txt += `- kategori list\n- kategori tambah <nama>\n- kategori map <keyword> => <kategori>\n- kategori rules\n\n`;
     txt += `- token\n- token reset\n- invite\n- invite editor\n- invite list\n- invite cabut <id>\n- akses list\n- akses cabut <user_id>\n`;

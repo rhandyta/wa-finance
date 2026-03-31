@@ -21,6 +21,35 @@ function normalizeTextForHash(text) {
   return String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Resolves relative date keywords in text into an absolute date string.
+ * Returns `null` if no relative date keyword is found.
+ */
+function resolveRelativeDate(text) {
+  const lower = text.toLowerCase();
+  const now = new Date();
+
+  // Next month: "bulan depan", "depan", "bulan berikutnya", "next month", "next"
+  if (/bulan depan|bulan berikutnya|next month|\bdepan\b|\bnext\b/i.test(lower)) {
+    const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return formatDateYyyyMmDd(d);
+  }
+
+  // Tomorrow: "besok", "tomorrow"
+  if (/\bbesok\b|\btomorrow\b/i.test(lower)) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    return formatDateYyyyMmDd(d);
+  }
+
+  // Yesterday: "kemarin", "yesterday"
+  if (/\bkemarin\b|\byesterday\b/i.test(lower)) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return formatDateYyyyMmDd(d);
+  }
+
+  return null;
+}
+
 async function processTransaction(message, senderId, accountId) {
   let rawText = message.body;
   let mediaFile = null;
@@ -58,6 +87,9 @@ async function processTransaction(message, senderId, accountId) {
     return;
   }
 
+  // Resolve relative date keywords BEFORE sending to AI
+  const forcedDate = resolveRelativeDate(rawText);
+
   try {
     const parts = splitIntoTransactions(rawText);
     const transactions = [];
@@ -85,9 +117,14 @@ async function processTransaction(message, senderId, accountId) {
         structuredData.receipt_path = receiptPath;
         structuredData.receipt_hash = receiptHash;
         structuredData.text_hash = textHash;
-        if (!structuredData.transaction_date) {
+
+        // Override date: forcedDate always wins over AI's guess or default
+        if (forcedDate) {
+          structuredData.transaction_date = forcedDate;
+        } else if (!structuredData.transaction_date) {
           structuredData.transaction_date = formatDateYyyyMmDd(new Date());
         }
+
         const fingerprintSource = normalizeTextForHash(
           [
             structuredData.transaction_date,

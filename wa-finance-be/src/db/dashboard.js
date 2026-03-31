@@ -165,23 +165,28 @@ async function getBudgetStatus(accountId, monthKey, targetCurrency = 'IDR') {
     `SELECT category, limit_amount, currency FROM budgets WHERE account_id = ? AND month_key = ? ORDER BY category ASC`,
     [accountId, mk],
   );
-  const [spendRows] = await pool.execute(
-    `SELECT category, currency, SUM(amount) AS total
+  const [txRows] = await pool.execute(
+    `SELECT category, type, currency, SUM(amount) AS total
      FROM transactions
-     WHERE account_id = ? AND type = 'OUT' AND transaction_date >= ? AND transaction_date <= ?
-     GROUP BY category, currency`,
+     WHERE account_id = ? AND transaction_date >= ? AND transaction_date <= ?
+     GROUP BY category, type, currency`,
     [accountId, startDate, endDate],
   );
-  const spentMap = new Map();
-  spendRows.forEach((r) => {
+  const categoryMap = new Map();
+  txRows.forEach((r) => {
     const key = r.category;
-    const converted = convertAmount(Number(r.total) || 0, r.currency || 'IDR', targetCurrency);
-    spentMap.set(key, (spentMap.get(key) || 0) + converted);
+    const amount = convertAmount(Number(r.total) || 0, r.currency || 'IDR', targetCurrency);
+    if (!categoryMap.has(key)) categoryMap.set(key, { in: 0, out: 0 });
+    const vals = categoryMap.get(key);
+    if (r.type === 'IN') vals.in += amount;
+    if (r.type === 'OUT') vals.out += amount;
   });
 
   const items = budgetRows.map((b) => {
     const limit = convertAmount(Number(b.limit_amount) || 0, b.currency || 'IDR', targetCurrency);
-    const spent = spentMap.get(b.category) || 0;
+    const vals = categoryMap.get(b.category) || { in: 0, out: 0 };
+    // Progres adalah selisih absolut (bisa pengeluaran bersih atau pencapaian pendapatan)
+    const spent = Math.abs(vals.out - vals.in);
     const pct = limit > 0 ? spent / limit : null;
     return {
       category: b.category,

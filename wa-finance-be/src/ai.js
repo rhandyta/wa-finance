@@ -67,7 +67,13 @@ The JSON object MUST have these keys:
    - If no unit is given and the amount is less than 1000, assume it's in thousands for typical Indonesian transactions (e.g., "beli ayam 50" → 50000).
 3.  "kategori": string, infer a relevant category (e.g., "Belanja Bulanan", "Konsumsi", "Elektronik", "Gaji").
 4.  "keterangan": string, a brief description (e.g., the name of the store or a summary).
-5.  "transaction_date": string, in "YYYY-MM-DD" format. Use the date on the receipt. If no date is on the receipt, use today's date.
+5.  "transaction_date": string, in "YYYY-MM-DD" format. 
+    - Use the date on the receipt if present. 
+    - If the user uses relative terms:
+      - "bulan depan", "depan", or "next month": use the 1st day of the next month relative to today.
+      - "besok" or "tomorrow": use today's date + 1 day.
+      - "kemarin" or "yesterday": use today's date - 1 day.
+    - If no date is on the receipt and no relative terms are in the text, use today's date.
 6.  "items": An array of objects, where each object represents an item on the receipt. Each object MUST have these keys:
     - "item_name": string, the name of the product.
     - "quantity": number, the quantity of the product purchased. Default to 1 if not specified.
@@ -79,8 +85,8 @@ Rules:
 - The "nominal" MUST be the grand total. If you sum the items and it doesn't match the total on the receipt, still use the official total for "nominal".
 - If the text is a command like "laporan" or any other conversational text that is not a transaction, return a JSON object with a single key "error" with the value "Bukan transaksi".
 
-Example 1 (Simple Text): "bayar tol kemarin 25000"
-Output 1: { "tipe": "OUT", "nominal": 25000, "kategori": "Transportasi", "keterangan": "Bayar tol", "transaction_date": "${yesterday.toISOString().slice(0, 10)}", "items": [] }
+Example 1 (Relative Date): "bayar kontrakan 2jt bulan depan"
+Output 1: { "tipe": "OUT", "nominal": 2000000, "kategori": "Rumah", "keterangan": "Kontrakan bulan depan", "transaction_date": "${new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().slice(0, 10)}", "items": [] }
 
 Example 2 (Receipt Text): "Indomaret Tanggal: 14-03-2026 CHITATO LITE 2x10000 20000 AQUA 600ML 1x3500 3500 TOTAL 23500"
 Output 2: { "tipe": "OUT", "nominal": 23500, "kategori": "Belanja Harian", "keterangan": "Indomaret", "transaction_date": "2026-03-14", "items": [ { "item_name": "CHITATO LITE", "quantity": 2, "price": 20000 }, { "item_name": "AQUA 600ML", "quantity": 1, "price": 3500 } ] }
@@ -88,17 +94,12 @@ Output 2: { "tipe": "OUT", "nominal": 23500, "kategori": "Belanja Harian", "kete
 Example 3 (Non-transaction Text): "laporan bulanan dong"
 Output 3: { "error": "Bukan transaksi" }
 
-Example 4 (Income Text): "gajian dari kantor 5000000"
-Output 4: { "tipe": "IN", "nominal": 5000000, "kategori": "Gaji", "keterangan": "Gajian dari kantor", "transaction_date": "${today.toISOString().slice(0, 10)}", "items": [] }
+Example 4 (Tomorrow): "beli tiket bioskop 50rb besok"
+Output 4: { "tipe": "OUT", "nominal": 50000, "kategori": "Hiburan", "keterangan": "Tiket bioskop", "transaction_date": "${new Date(today.getTime() + 86400000).toISOString().slice(0, 10)}", "items": [] }
 
-Example 5 (Income with keyword): "dapat bonus 200000"
-Output 5: { "tipe": "IN", "nominal": 200000, "kategori": "Bonus", "keterangan": "Dapat bonus", "transaction_date": "${today.toISOString().slice(0, 10)}", "items": [] }
-
-Example 6 (Amount without unit): "beli ayam 50"
-Output 6: { "tipe": "OUT", "nominal": 50000, "kategori": "Makanan", "keterangan": "Beli ayam", "transaction_date": "${today.toISOString().slice(0, 10)}", "items": [] }
-
-Example 7 (Income from sale): "jual laptop 7500000"
-Output 7: { "tipe": "IN", "nominal": 7500000, "kategori": "Penjualan", "keterangan": "Jual laptop", "transaction_date": "${today.toISOString().slice(0, 10)}", "items": [] }`;
+Example 5 (Income next month): "gajian depan 5juta"
+Output 5: { "tipe": "IN", "nominal": 5000000, "kategori": "Gaji", "keterangan": "Gajian depan", "transaction_date": "${new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().slice(0, 10)}", "items": [] }
+`;
 
   const openaiOptions = {
     apiKey: config.ai.apiKey,

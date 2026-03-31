@@ -222,7 +222,7 @@ async function apiPostPublic<T>(baseUrl: string, path: string, body: any) {
   return json as T;
 }
 
-async function fetchDashboard(cfg: AppConfig, startDate: string, endDate: string, monthKey: string) {
+async function fetchDashboard(cfg: AppConfig, startDate: string, endDate: string, budgetMonthKey: string) {
   const common = {
     start: startDate,
     end: endDate,
@@ -234,7 +234,7 @@ async function fetchDashboard(cfg: AppConfig, startDate: string, endDate: string
     apiGet<BreakdownByCategory>(cfg, '/api/dashboard/by-category', { ...common, type: 'OUT', limit: 10 }),
     apiGet<BreakdownByMerchant>(cfg, '/api/dashboard/by-merchant', { ...common, type: 'OUT', limit: 10 }),
     apiGet<BudgetStatus>(cfg, '/api/dashboard/budget-status', {
-      month: monthKey,
+      month: budgetMonthKey,
       currency: cfg.currency,
     }),
   ]);
@@ -552,14 +552,21 @@ function DashboardScreen({ config, onLogout }: { config: AppConfig; onLogout: ()
   };
 
   const [range, setRange] = useState(computeRange);
+  const [budgetMonthOffset, setBudgetMonthOffset] = useState(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (bOffset = budgetMonthOffset) => {
     setLoading(true);
     setError(null);
     const nextRange = computeRange();
     setRange(nextRange);
+    
+    const bDate = new Date();
+    // Set to 1st to avoid overflow if today is 31st and next month has 30 days
+    const targetMonth = bDate.getMonth() + bOffset;
+    const bMonthKey = monthKeyFromDate(new Date(bDate.getFullYear(), targetMonth, 1));
+
     try {
-      const dashboard = await fetchDashboard(config, nextRange.startDate, nextRange.endDate, nextRange.monthKey);
+      const dashboard = await fetchDashboard(config, nextRange.startDate, nextRange.endDate, bMonthKey);
       setData(dashboard);
     } catch (e: any) {
       setData(null);
@@ -567,7 +574,7 @@ function DashboardScreen({ config, onLogout }: { config: AppConfig; onLogout: ()
     } finally {
       setLoading(false);
     }
-  }, [config]);
+  }, [config, budgetMonthOffset]);
 
   useEffect(() => {
     refresh();
@@ -620,7 +627,18 @@ function DashboardScreen({ config, onLogout }: { config: AppConfig; onLogout: ()
             items={data.byMerchantOut.items.map((x) => ({ label: x.merchant, value: x.total }))}
             currency={config.currency}
           />
-          <BudgetCard budget={data.budgetStatus} currency={config.currency} />
+          <BudgetCard
+            budget={data.budgetStatus}
+            currency={config.currency}
+            onPrevMonth={() => {
+              const next = budgetMonthOffset - 1;
+              setBudgetMonthOffset(next);
+            }}
+            onNextMonth={() => {
+              const next = budgetMonthOffset + 1;
+              setBudgetMonthOffset(next);
+            }}
+          />
         </>
       ) : null}
     </ScrollView>
@@ -698,7 +716,17 @@ function TopListCard({
   );
 }
 
-function BudgetCard({ budget, currency }: { budget: BudgetStatus; currency: string }) {
+function BudgetCard({
+  budget,
+  currency,
+  onPrevMonth,
+  onNextMonth,
+}: {
+  budget: BudgetStatus;
+  currency: string;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+}) {
   const shown = budget.items
     .filter((x) => x.limit > 0 || x.spent > 0)
     .slice()
@@ -707,9 +735,20 @@ function BudgetCard({ budget, currency }: { budget: BudgetStatus; currency: stri
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>Budget ({budget.monthKey})</Text>
-      <View style={{ height: 6 }} />
-      {shown.length === 0 ? <Text style={styles.muted}>Belum ada budget.</Text> : null}
+      <View style={[styles.row, { justifyContent: 'space-between', marginBottom: 8 }]}>
+        <Text style={styles.label}>Budget ({budget.monthKey})</Text>
+        <View style={styles.row}>
+          <View style={{ width: 80 }}>
+            <Button title="< Prev" onPress={onPrevMonth} color="#6070a4" />
+          </View>
+          <View style={{ width: 80 }}>
+            <Button title="Next >" onPress={onNextMonth} color="#6070a4" />
+          </View>
+        </View>
+      </View>
+      {shown.length === 0 ? (
+        <Text style={[styles.muted, { marginTop: 8 }]}>Belum ada budget untuk bulan ini.</Text>
+      ) : null}
       {shown.map((it, idx) => {
         const pctText = it.pct === null ? '—' : `${Math.round(it.pct * 100)}%`;
         const color =
