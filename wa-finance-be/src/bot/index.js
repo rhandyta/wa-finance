@@ -18,6 +18,7 @@ const tx = require('./transaction');
 const category = require('./category');
 const merchant = require('./merchant');
 const { extractInteractiveId } = require('./interactive');
+const { setQrCode } = require('../qr-store');
 
 const attemptBuckets = new Map();
 let sharedClient = null;
@@ -53,6 +54,7 @@ function createBot() {
   client.on('qr', (qr) => {
     console.log('QR RECEIVED, scan it with your phone');
     qrcode.generate(qr, { small: true });
+    setQrCode(qr);
   });
 
   client.on('ready', () => {

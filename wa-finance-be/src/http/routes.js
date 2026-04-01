@@ -7,6 +7,8 @@ const { logger } = require('../logger');
 const { metrics, inc, setGauge } = require('../metrics');
 const { checkSchema } = require('../db/schemaCheck');
 const { apiRouter } = require('./api');
+const { getQrCode, getQrAuthToken } = require('../qr-store');
+const QR = require('qrcode');
 
 let lastPythonCheck = { at: 0, ok: null, error: null };
 
@@ -83,6 +85,30 @@ function registerRoutes(app) {
 
   app.get('/metrics', (req, res) => {
     res.json({ ok: true, metrics });
+  });
+
+  app.get('/qr', async (req, res) => {
+    // Auth check
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : req.query.token;
+    
+    if (!token || token !== getQrAuthToken()) {
+      return res.status(401).json({ ok: false, error: 'unauthorized' });
+    }
+
+    const { qr } = getQrCode();
+    if (!qr) {
+      return res.status(404).json({ ok: false, error: 'no_qr', message: 'QR not available. WhatsApp may already be connected.' });
+    }
+
+    try {
+      // Generate QR as PNG image
+      const qrImage = await QR.toBuffer(qr, { type: 'png', width: 400 });
+      res.set('Content-Type', 'image/png');
+      res.send(qrImage);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: 'qr_generate_failed' });
+    }
   });
 
   app.use('/api', apiRouter);
