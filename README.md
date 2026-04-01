@@ -1,203 +1,296 @@
-# wa-finance (monorepo)
+# 🤑 wa-finance
 
-Bot WhatsApp untuk pencatatan keuangan (teks & foto struk) + dashboard web untuk monitoring. Backend menyimpan data di MySQL, melakukan OCR struk via Python (EasyOCR), dan bisa menggunakan AI (DeepSeek) untuk ekstraksi transaksi dari bahasa natural.
+Bot WhatsApp untuk pencatatan keuangan pribadi (teks & foto struk) + dashboard web untuk monitoring.  
+Backend menyimpan data di MySQL, melakukan OCR struk via Python (EasyOCR), dan menggunakan AI (DeepSeek) untuk ekstraksi transaksi dari bahasa natural.
+
+---
 
 ## Struktur Repo
 
-- `wa-finance-be`: backend Node.js (Express) + WhatsApp bot (`whatsapp-web.js`)
-- `wa-finance-fe`: frontend Expo (React Native Web) untuk dashboard
+```
+wa-finance/
+├── wa-finance-be/   # Backend Node.js (Express) + WhatsApp bot
+├── wa-finance-fe/   # Frontend Expo (React Native Web) dashboard
+├── .env.example     # Template environment variables
+└── docker-compose.yml / docker-compose.prod.yml
+```
 
 ## Stack Teknologi
 
-- **Backend**: Node.js + Express
-- **WhatsApp**: `whatsapp-web.js` + `qrcode-terminal`
-- **Database**: MySQL (`mysql2`)
-- **OCR**: Python EasyOCR (dipanggil dari Node via `child_process`)
-- **AI (NLP)**: DeepSeek (via `openai` library)
-- **Frontend**: Expo + React Native Web
+| Layer | Teknologi |
+|-------|-----------|
+| **Backend** | Node.js + Express |
+| **WhatsApp** | `whatsapp-web.js` + `qrcode-terminal` |
+| **Database** | MySQL (`mysql2`) |
+| **OCR** | Python EasyOCR (via `child_process`) + `jimp` (preprocessing) |
+| **AI (NLP)** | DeepSeek (via `openai` library) + `lru-cache` |
+| **Frontend** | Expo + React Native Web |
 
 ## Prasyarat
 
-- Node.js (disarankan versi modern; minimal sesuai Expo yang digunakan)
-- MySQL server (lokal atau docker)
-- Python + EasyOCR (opsional, tapi diperlukan kalau mau OCR struk)
+- **Node.js** (v16+)
+- **MySQL** server (lokal atau Docker)
+- **Python 3** + `easyocr` (opsional, untuk fitur OCR struk)
 
-## Fitur Utama
+---
 
-- **Input transaksi dari chat WhatsApp**
-  - Teks natural (contoh: “tadi bayar parkir 5000”)
-  - Foto struk (OCR), atau foto + caption
-  - Preview & konfirmasi sebelum simpan (bisa koreksi field sebelum `ok`)
-- **Kelola transaksi**
-  - Undo/batal dan restore
-  - Edit transaksi terakhir / berdasarkan ID
-  - Hapus transaksi (dengan audit log)
-  - Pencarian transaksi (`cari <keyword>`, pagination)
-- **Laporan & export**
-  - Flow `laporan` (interactive list/buttons jika didukung)
-  - Export CSV ringkas/detail, range custom
-- **Budget & notifikasi**
-  - Budget bulanan per kategori, status (ok/warn/over)
-  - Notifikasi saat melewati ambang tertentu
-- **Transaksi berulang**
-  - Tambah/list/nonaktif transaksi recurring
-- **Multi akun & sharing akses**
-  - Akun (`accounts`) dan membership (`account_members`)
-  - Token monitoring (`token`, `pakai token <token>`, `monitor off`)
-  - Invite single-use (viewer/editor) dan manajemen akses
-- **Dashboard web**
-  - Ringkasan, timeseries, top kategori/merchant, budget status
-  - Login tanpa API key: nomor HP + token akun + OTP WhatsApp
-- **Operasional**
-  - Healthcheck `/health`, metrics `/metrics`
-  - Retention struk (opsional)
-  - Audit log untuk aksi penting
+## Quick Start
 
-## Setup Database
-
-1. Buat database (contoh: `wa_finance`)
-2. Import skema awal dari [setup.sql](file:///d:/Project/Real%20Project/wa-finance/wa-finance-be/setup.sql)
-3. Saat aplikasi berjalan, `ensureSchema()` akan membantu menambahkan tabel/kolom yang belum ada (migrasi ringan)
-
-## Konfigurasi (.env)
-
-Gunakan file `.env` di root repo (contoh: `.env.example`).
-
-**Minimal agar jalan**
-- `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- `DB_PORT` (opsional; kalau kosong, driver pakai default MySQL)
-- `PORT` (default 3000)
-- `DISABLE_BOT` (0 aktifkan bot, 1 matikan bot)
-- `EXPO_PUBLIC_BASE_URL` (default `http://localhost:3000`)
-
-**Opsional (direkomendasikan)**
-- `DEEPSEEK_API_KEY`, `DEEPSEEK_API_BASE_URL` (untuk ekstraksi AI)
-- `HTTP_API_KEY` (opsional, dukung auth lama `x-api-key`)
-- `AUTH_OTP_SECRET` (secret hashing OTP dashboard)
-- `CORS_ALLOW_ORIGINS` (whitelist origin web, comma-separated; support wildcard `*`, contoh `http://localhost:*`)
-- `RECEIPT_RETENTION_DAYS` (hapus struk lama setelah N hari)
-
-**Env terkait OCR**
-- `PYTHON_BIN` (default `python`)
-- `OCR_TIMEOUT_MS` (default internal; gunakan env untuk menaikkan timeout)
-- `OCR_LEXICON_EXTRA` (opsional; daftar kata dipisah koma untuk bantu koreksi)
-- `OCR_DEBUG_SAVE` (opsional; simpan output debug OCR)
-
-## Menjalankan (Dev)
-
-Salin env:
+### 1. Clone & Install
 
 ```bash
-copy .env.example .env
+git clone <repo-url>
+cd wa-finance
+cp .env.example .env   # edit sesuai kebutuhan
+npm run setup           # install semua dependency (root + be + fe)
 ```
 
-Install semua dependency:
+### 2. Setup Database
+
+1. Buat database MySQL (contoh: `wa_finance`)
+2. Import skema: jalankan `wa-finance-be/setup.sql`
+3. `ensureSchema()` akan otomatis menambahkan tabel/kolom baru saat aplikasi berjalan
+
+### 3. Jalankan
 
 ```bash
-npm run setup
-```
-
-Jalankan backend + frontend (tanpa bot):
-
-```bash
+# Backend + Frontend (tanpa bot WhatsApp)
 npm run dev
-```
 
-Jalankan backend + frontend + bot (untuk OTP WhatsApp & fitur bot):
-
-```bash
+# Backend + Frontend + Bot WhatsApp (untuk OTP & fitur bot)
 npm run dev:bot
 ```
 
-Saat bot aktif, scan QR di terminal menggunakan WhatsApp (Linked Devices).
+Saat bot aktif, scan QR code di terminal menggunakan WhatsApp → Linked Devices.
 
-## Dashboard Web (Login OTP WhatsApp)
+---
 
-1. Isi nomor HP WhatsApp dan token akun.
-2. Klik **Kirim OTP WhatsApp** (kode masuk ke WhatsApp).
-3. Masukkan OTP 6 digit.
-4. Klik **Verifikasi & Masuk**.
+## Konfigurasi (.env)
 
-Token akun bisa didapat dari bot WhatsApp: kirim `token` (khusus owner).
+### Wajib
 
-## Perintah Bot WhatsApp (Ringkas)
+| Variable | Keterangan |
+|----------|------------|
+| `DB_HOST` | Host database MySQL |
+| `DB_USER` | Username database |
+| `DB_PASSWORD` | Password database |
+| `DB_NAME` | Nama database |
 
-- `help` / `menu`
-- `laporan`
-- `cari <keyword>` / `cari <keyword> page <n>`
-- `export ringkas <periode>` / `export detail <periode>` / `export YYYY-MM-DD YYYY-MM-DD`
-- `struk terakhir`
-- `undo` / `batal` / `undo kembali`
-- `edit transaksi terakhir jumlah <angka>`
-- `edit transaksi <id> jumlah <angka>`
-- `hapus transaksi <id>`
-- `set currency <IDR|USD|EUR>`
-- `budget set <kategori> <jumlah>` / `budget list`
-- `ulang tambah <in|out> <jumlah> <kategori> ; <keterangan> ; <tgl 1-28>`
-- `ulang list` / `ulang hapus <id>`
-- `kategori list` / `kategori tambah <nama>` / `kategori map <keyword> => <kategori>` / `kategori rules`
-- `merchant map <keyword> => <merchant>` / `merchant rules`
-- Akun & akses:
-  - `akun` / `akun pilih <nomor>` / `akun baru`
-  - `token` / `token reset` / `pakai token <token>` / `monitor off`
-  - `invite` / `invite editor` / `invite list` / `invite cabut <id>`
-  - `akses list` / `akses cabut <user_id>`
+### Opsional (Direkomendasikan)
 
-## HTTP API (Backend)
+| Variable | Default | Keterangan |
+|----------|---------|------------|
+| `PORT` | `3000` | Port HTTP server |
+| `DISABLE_BOT` | `0` | Set `1` untuk matikan bot WhatsApp |
+| `DEEPSEEK_API_KEY` | — | API key DeepSeek untuk ekstraksi AI |
+| `DEEPSEEK_API_BASE_URL` | `https://api.deepseek.com/v1` | Base URL API DeepSeek |
+| `HTTP_API_KEY` | — | Auth lama via header `x-api-key` |
+| `QR_AUTH_TOKEN` | *(auto-generated)* | Token untuk akses QR code via HTTP |
+| `AUTH_OTP_SECRET` | — | Secret hashing OTP dashboard |
+| `CORS_ALLOW_ORIGINS` | `localhost` | Whitelist origin (comma-separated, support `*`) |
+| `RECEIPT_RETENTION_DAYS` | — | Hapus struk lama setelah N hari |
+| `EXPO_PUBLIC_BASE_URL` | `http://localhost:3000` | Base URL backend untuk frontend |
 
-Server default di `http://localhost:3000`.
+### OCR
 
-- Healthcheck: `GET /health`
-- Metrics: `GET /metrics`
-- Debug config: `GET /debug/config`
+| Variable | Default | Keterangan |
+|----------|---------|------------|
+| `PYTHON_BIN` | `python` | Path ke binary Python |
+| `OCR_TIMEOUT_MS` | `120000` | Timeout OCR dalam ms |
+| `OCR_LEXICON_EXTRA` | — | Kata tambahan untuk koreksi OCR (comma-separated) |
+| `OCR_DEBUG_SAVE` | `false` | Simpan output OCR debug |
 
-**Auth Dashboard (OTP via WhatsApp)**
-- `POST /api/auth/request-otp` body: `{ phone, token }`
-- `POST /api/auth/verify-otp` body: `{ phone, token, otp }` → return `{ sessionToken, currency }`
+---
 
-**Dashboard**
-- `GET /api/dashboard/summary?start=YYYY-MM-DD&end=YYYY-MM-DD&currency=IDR`
-- `GET /api/dashboard/timeseries?start=...&end=...&bucket=day&currency=...`
-- `GET /api/dashboard/by-category?start=...&end=...&type=OUT&limit=...&currency=...`
-- `GET /api/dashboard/by-merchant?start=...&end=...&type=OUT&limit=...&currency=...`
-- `GET /api/dashboard/budget-status?month=YYYY-MM&currency=...`
+## Fitur Utama
 
-**Transaksi**
-- `GET /api/transactions?...` (filter `start/end/type/category/merchant/q`, pagination `limit/offset`, `includeItems`)
-- `GET /api/transactions/:id`
+### 📱 Input Transaksi via WhatsApp
+- **Teks natural** — *"tadi bayar parkir 5000"*
+- **Foto struk** (OCR otomatis) atau foto + caption
+- **Preview & konfirmasi** sebelum simpan (bisa koreksi field)
 
-**Audit**
-- `GET /api/audit?start=...&end=...&action=...&limit=...&offset=...`
+### 📊 Laporan & Export
+- Laporan interaktif (list/buttons jika didukung)
+- Export CSV ringkas/detail, range custom
 
-**Import**
-- `POST /api/import/statement` body: `{ csv, dryRun }`
+### 💰 Budget & Notifikasi
+- Budget bulanan per kategori
+- Notifikasi otomatis saat 80% dan 100%
 
-Catatan: endpoint `/api/*` bisa diakses pakai `Authorization: Bearer <sessionToken>` (dashboard), dan opsional masih mendukung `x-api-key` jika `HTTP_API_KEY` diset.
+### 🔁 Transaksi Berulang
+- Tambah, list, dan nonaktifkan recurring transaction
 
-## Docker & PM2 (Backend)
+### 👥 Multi Akun & Sharing
+- Akun terpisah (`accounts` + `account_members`)
+- Token monitoring (read-only), invite viewer/editor
+- Manajemen akses
 
-- Docker: jalankan dari `wa-finance-be/docker-compose.yml`
-- PM2: `npm --prefix wa-finance-be run start:pm2`
+### 🖥️ Dashboard Web
+- Ringkasan, timeseries, top kategori/merchant, budget status
+- Login via OTP WhatsApp (nomor HP + token akun)
+
+### 🔧 Operasional
+- Healthcheck `/health`, metrics `/metrics`
+- QR code via HTTP `/qr`
+- Audit log, retention struk
+
+---
+
+## Perintah Bot WhatsApp
+
+### Umum
+| Perintah | Keterangan |
+|----------|------------|
+| `help` / `menu` | Daftar perintah |
+| `laporan` | Menu periode laporan |
+| `cari <keyword>` | Cari transaksi (+ `page <n>` untuk pagination) |
+
+### Transaksi
+| Perintah | Keterangan |
+|----------|------------|
+| `undo` / `batal` | Batalkan transaksi terakhir |
+| `undo kembali` | Restore transaksi yang dibatalkan |
+| `edit transaksi terakhir jumlah <n>` | Edit nominal terakhir |
+| `edit transaksi <id> jumlah <n>` | Edit nominal berdasarkan ID |
+| `hapus transaksi <id>` | Hapus transaksi |
+| `set currency <IDR\|USD\|EUR>` | Ubah mata uang |
+
+### Export
+| Perintah | Keterangan |
+|----------|------------|
+| `export ringkas <periode>` | Export CSV ringkas |
+| `export detail <periode>` | Export CSV per-item |
+| `export YYYY-MM-DD YYYY-MM-DD` | Export range custom |
+| `struk terakhir` | Kirim file struk terakhir |
+
+### Budget & Recurring
+| Perintah | Keterangan |
+|----------|------------|
+| `budget set <kategori> <jumlah>` | Set budget |
+| `budget list` | Status budget bulan ini |
+| `ulang tambah <in\|out> <jumlah> <kategori> ; <ket> ; <tgl>` | Tambah recurring |
+| `ulang list` | List recurring |
+| `ulang hapus <id>` | Nonaktifkan recurring |
+
+### Kategori & Merchant
+| Perintah | Keterangan |
+|----------|------------|
+| `kategori list` / `kategori tambah <nama>` | Kelola kategori |
+| `kategori map <keyword> => <kategori>` | Mapping keyword → kategori |
+| `merchant map <keyword> => <merchant>` | Normalisasi merchant |
+| `kategori rules` / `merchant rules` | Lihat daftar mapping |
+
+### Akun & Akses
+| Perintah | Keterangan |
+|----------|------------|
+| `akun` / `akun pilih <n>` / `akun baru` | Kelola akun |
+| `token` / `token reset` | Token akun (owner only) |
+| `pakai token <token>` | Monitoring akun lain (read-only) |
+| `monitor off` | Kembali ke akun sendiri |
+| `invite` / `invite editor` | Buat invite viewer/editor |
+| `invite list` / `invite cabut <id>` | Kelola invite |
+| `akses list` / `akses cabut <user_id>` | Kelola member |
+
+---
+
+## HTTP API
+
+Server default: `http://localhost:3000`
+
+### Endpoint Publik
+
+| Method | Path | Keterangan |
+|--------|------|------------|
+| `GET` | `/health` | Healthcheck (DB, Python, schema) |
+| `GET` | `/metrics` | Metrics internal |
+| `GET` | `/qr?token=<QR_AUTH_TOKEN>` | QR code WhatsApp (PNG) |
+| `GET` | `/debug/config` | Debug config (localhost only) |
+| `GET` | `/debug/cors` | Debug CORS (localhost only) |
+
+### Auth (OTP via WhatsApp)
+
+| Method | Path | Body |
+|--------|------|------|
+| `POST` | `/api/auth/request-otp` | `{ phone, token }` |
+| `POST` | `/api/auth/verify-otp` | `{ phone, token, otp }` → `{ sessionToken, currency }` |
+
+### Dashboard  
+Auth: `Authorization: Bearer <sessionToken>`
+
+| Method | Path | Query Params |
+|--------|------|--------------|
+| `GET` | `/api/dashboard/summary` | `start`, `end`, `currency` |
+| `GET` | `/api/dashboard/timeseries` | `start`, `end`, `bucket`, `currency` |
+| `GET` | `/api/dashboard/by-category` | `start`, `end`, `type`, `limit`, `currency` |
+| `GET` | `/api/dashboard/by-merchant` | `start`, `end`, `type`, `limit`, `currency` |
+| `GET` | `/api/dashboard/budget-status` | `month`, `currency` |
+
+### Transaksi & Audit
+
+| Method | Path | Query Params |
+|--------|------|--------------|
+| `GET` | `/api/transactions` | `start`, `end`, `type`, `category`, `merchant`, `q`, `limit`, `offset`, `includeItems` |
+| `GET` | `/api/transactions/:id` | — |
+| `GET` | `/api/audit` | `start`, `end`, `action`, `limit`, `offset` |
+| `POST` | `/api/import/statement` | Body: `{ csv, dryRun }` |
+
+---
+
+## Dashboard Web (Login OTP)
+
+1. Isi nomor HP WhatsApp dan token akun
+2. Klik **Kirim OTP WhatsApp** (kode masuk ke WhatsApp)
+3. Masukkan OTP 6 digit
+4. Klik **Verifikasi & Masuk**
+
+> Token akun didapat dari bot WhatsApp: kirim `token` (khusus owner).
+
+---
+
+## Deployment
+
+### Docker Compose
+
+```bash
+npm run docker:up    # build & start
+npm run docker:down  # stop
+```
+
+### PM2
+
+```bash
+npm --prefix wa-finance-be run start:pm2
+```
+
+### Build Web untuk Production
+
+```bash
+npm run build:web    # output ke wa-finance-be/public/web/
+npm run deploy:web   # build + start backend
+```
+
+---
+
+## Testing
+
+```bash
+npm test   # backend unit tests + frontend typecheck
+```
 
 ## Evaluasi OCR (Batch)
-
-Jalankan evaluasi OCR untuk folder gambar:
 
 ```bash
 node wa-finance-be/scripts/ocr_eval.js path\to\folder\images
 ```
 
+---
+
 ## Troubleshooting
 
-- **CORS error dari web**: set `CORS_ALLOW_ORIGINS` agar mencakup origin FE (contoh `http://localhost:*`)
-- **OTP tidak terkirim**: pastikan bot aktif (`npm run dev:bot`) dan QR sudah discan
-- **`/health` 503**: biasanya DB belum siap atau Python EasyOCR tidak tersedia (cek detail JSON response)
-- **OCR lambat/timeout**: naikkan `OCR_TIMEOUT_MS` atau set `PYTHON_BIN` yang benar
-
-## Testing
-
-Jalankan test backend + typecheck frontend:
-
-```bash
-npm test
-```
+| Masalah | Solusi |
+|---------|--------|
+| CORS error dari web | Set `CORS_ALLOW_ORIGINS` mencakup origin FE (contoh: `http://localhost:*`) |
+| OTP tidak terkirim | Pastikan bot aktif (`npm run dev:bot`) dan QR sudah discan |
+| `/health` 503 | Cek DB, Python EasyOCR, atau schema — lihat detail JSON response |
+| OCR lambat/timeout | Naikkan `OCR_TIMEOUT_MS`, cek `PYTHON_BIN` |
+| "Unknown column …" | Restart aplikasi agar `ensureSchema()` migrasi kolom baru |
