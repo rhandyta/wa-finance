@@ -249,7 +249,26 @@ Auth: `Authorization: Bearer <sessionToken>`
 
 ## Deployment
 
-### Docker Compose
+### Coolify (Rekomendasi untuk Production)
+
+Proyek ini sudah disiapkan untuk integrasi mudah dengan [Coolify](https://coolify.io/).
+
+1. Tambahkan resource baru di Coolify: **Project -> New -> Git Repository** (atau Docker Compose jika menggunakan kode lokal).
+2. Tentukan repository Git proyek Anda.
+3. Pada tab **Configuration**, ubah build pack ke **Docker Compose**.
+4. Di textbox Docker Compose, Anda bisa melakukan salah satu dari dua cara berikut:
+   - Pilih file `docker-compose.coolify.yml`.
+   - Atau langsung isi isinya jika menggunakan text editor bawaan Coolify.
+5. Pastikan semua Environment Variables di dalam Coolify terisi (khususnya `HTTP_API_KEY`, `DEEPSEEK_API_KEY`, `AUTH_OTP_SECRET`, dan `EXPO_PUBLIC_BASE_URL`).
+   - `EXPO_PUBLIC_BASE_URL` adalah URL publik backend Anda (contoh: `https://api.domain-anda.com`).
+6. Atur routing subdomain/domain di menu **Domains** di dalam container `frontend` dan `backend` di konfigurasi Coolify:
+   - Container `frontend`: misalnya `https://app.domain-anda.com`
+   - Container `backend`: misalnya `https://api.domain-anda.com`
+7. Klik **Deploy**.
+
+> **Note:** `docker-compose.coolify.yml` secara sengaja tidak mem-bind port ke host (contohnya port 3000 atau 3306) untuk menghindari bentrok port pada instance server Coolify Anda. Coolify internal proxy (Traefik/Caddy) akan secara otomatis menangani routing dari web ke container melalui internal docker network.
+
+### Docker Compose Lokal
 
 ```bash
 npm run docker:up    # build & start
