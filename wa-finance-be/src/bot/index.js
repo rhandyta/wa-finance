@@ -44,11 +44,26 @@ function stripInvisibleChars(text) {
 function createBot() {
   const dbReady = ensureSchema();
 
+  const puppeteerOpts = {
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-extensions',
+    ],
+  };
+
+  // Use system Chromium if available (Docker environment)
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    puppeteerOpts.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
   const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
+    puppeteer: puppeteerOpts,
   });
 
   client.on('qr', (qr) => {

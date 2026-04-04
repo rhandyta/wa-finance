@@ -10,3 +10,4 @@ Dockerfile
 public/uploads
 coverage
 .nyc_output
+*.log

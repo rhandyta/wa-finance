@@ -36,12 +36,14 @@ services:
       EXPO_PUBLIC_BASE_URL: http://localhost:3000
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       AUTH_OTP_SECRET: ${AUTH_OTP_SECRET:-}
-      DISABLE_BOT: "1"
+      DISABLE_BOT: ${DISABLE_BOT:-1}
+      PUPPETEER_SKIP_DOWNLOAD: "true"
     ports:
       - "3000:3000"
     volumes:
-      - ./wa-finance-be:/app
-      - /app/node_modules
+      - wwebjs_auth:/app/.wwebjs_auth
+      - wwebjs_cache:/app/.wwebjs_cache
+      - uploads_data:/app/public/uploads
 
   frontend:
     build:
@@ -56,3 +58,6 @@ services:
 
 volumes:
   mysql_data:
+  wwebjs_auth:
+  wwebjs_cache:
+  uploads_data:

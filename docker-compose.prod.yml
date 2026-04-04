@@ -37,6 +37,7 @@ services:
       DEEPSEEK_API_BASE_URL: ${DEEPSEEK_API_BASE_URL:-https://api.deepseek.com/v1}
       AUTH_OTP_SECRET: ${AUTH_OTP_SECRET}
       DISABLE_BOT: ${DISABLE_BOT:-0}
+      PUPPETEER_SKIP_DOWNLOAD: "true"
     volumes:
       - wwebjs_auth:/app/.wwebjs_auth
       - wwebjs_cache:/app/.wwebjs_cache

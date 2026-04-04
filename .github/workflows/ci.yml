@@ -75,6 +75,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Verify backend image
+        run: |
+          docker run --rm wa-finance-be:latest node -e "console.log('Backend OK')"
+
       - name: Build frontend image
         uses: docker/build-push-action@v5
         with:
@@ -86,6 +90,10 @@ jobs:
             EXPO_PUBLIC_BASE_URL=http://localhost:3000
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify frontend image
+        run: |
+          docker run --rm wa-finance-fe:latest nginx -t
 
       - name: Verify docker-compose
         run: |
