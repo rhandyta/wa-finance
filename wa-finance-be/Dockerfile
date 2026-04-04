@@ -1,23 +1,40 @@
-FROM node:20-bullseye
+# Build stage
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 python3-pip libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 libgbm1 libasound2 libpangocairo-1.0-0 libpango-1.0-0 \
-  && rm -rf /var/lib/apt/lists/*
-
-ENV PIP_NO_CACHE_DIR=1
-RUN python3 -m pip install --upgrade pip \
-  && python3 -m pip install easyocr
-
+# Install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --only=production && npm cache clean --force
 
+# Copy source code
 COPY . .
+
+# Production stage
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install Python3 and OCR dependencies only if needed
+RUN apk add --no-cache python3 py3-pip
+
+# Copy node_modules and app from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/src ./src
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+USER nodejs
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 CMD ["npm", "start"]

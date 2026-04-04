@@ -1,27 +1,18 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.4
     environment:
       MYSQL_DATABASE: ${DB_NAME:-wa_finance}
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
-      # If using custom user, uncomment these:
-      # MYSQL_USER: ${DB_USER}
-      # MYSQL_PASSWORD: ${DB_PASSWORD}
-    ports:
-      - "3306:3306"
     command: ["--default-authentication-plugin=mysql_native_password"]
     volumes:
       - mysql_data:/var/lib/mysql
-    networks:
-      - wa-finance-network
     healthcheck:
-      test: ["CMD-SHELL", "mysql -u root -p$${MYSQL_ROOT_PASSWORD} -e 'SELECT 1;' || exit 1"]
-      timeout: 30s
-      retries: 10
-      start_period: 40s
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     restart: always
 
   backend:
@@ -34,7 +25,7 @@ services:
     environment:
       PORT: 3000
       DB_HOST: mysql
-      DB_USER: ${DB_USER:-root}
+      DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:-root}
       DB_NAME: ${DB_NAME:-wa_finance}
       HTTP_API_KEY: ${HTTP_API_KEY}
@@ -45,17 +36,11 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_API_BASE_URL: ${DEEPSEEK_API_BASE_URL:-https://api.deepseek.com/v1}
       AUTH_OTP_SECRET: ${AUTH_OTP_SECRET}
-      RECEIPT_RETENTION_DAYS: ${RECEIPT_RETENTION_DAYS}
       DISABLE_BOT: ${DISABLE_BOT:-0}
-    ports:
-      - "3000:3000"
     volumes:
-      # These volumes ensure session data and uploaded files are not lost when the container is recreated
       - wwebjs_auth:/app/.wwebjs_auth
       - wwebjs_cache:/app/.wwebjs_cache
       - uploads_data:/app/public/uploads
-    networks:
-      - wa-finance-network
     restart: always
 
   frontend:
@@ -63,14 +48,9 @@ services:
       context: ./wa-finance-fe
       dockerfile: Dockerfile
       args:
-        # Crucial for Expo Web: Must be the public accessible URL where the backend is hosted
         EXPO_PUBLIC_BASE_URL: ${EXPO_PUBLIC_BASE_URL}
-    ports:
-      - "80:80"
     depends_on:
       - backend
-    networks:
-      - wa-finance-network
     restart: always
 
 volumes:
@@ -78,7 +58,3 @@ volumes:
   wwebjs_auth:
   wwebjs_cache:
   uploads_data:
-
-networks:
-  wa-finance-network:
-    driver: bridge

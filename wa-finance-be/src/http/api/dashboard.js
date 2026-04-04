@@ -5,6 +5,8 @@ const {
   getBreakdownByCategory,
   getBreakdownByMerchant,
   getBudgetStatus,
+  getDistinctCategories,
+  getDistinctMerchants,
   yyyymm,
 } = require('../../db');
 const { requiredInt, optionalInt, optionalDate, optionalMonth, optionalCurrency } = require('./utils');
@@ -73,6 +75,24 @@ router.get('/budget-status', async (req, res) => {
   const currency = optionalCurrency(req.query.currency, 'IDR');
   const data = await getBudgetStatus(accountId, month, currency);
   res.json({ ok: true, data });
+});
+
+// GET /api/dashboard/categories - List distinct categories
+router.get('/categories', async (req, res) => {
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
+  const categories = await getDistinctCategories(accountId);
+  res.json({ ok: true, data: { categories } });
+});
+
+// GET /api/dashboard/merchants - List distinct merchants
+router.get('/merchants', async (req, res) => {
+  const accountId = Number.isFinite(req.auth?.accountId)
+    ? req.auth.accountId
+    : requiredInt(req.query.accountId, 'accountId');
+  const merchants = await getDistinctMerchants(accountId);
+  res.json({ ok: true, data: { merchants } });
 });
 
 module.exports = { dashboardRouter: router };

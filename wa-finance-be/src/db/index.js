@@ -20,4 +20,10 @@ module.exports = {
   ...dashboard,
   ...userSettings,
   convertAmount,
+  // Explicitly export new functions
+  createTransactionWithItems: transactions.createTransactionWithItems,
+  updateTransactionWithItems: transactions.updateTransactionWithItems,
+  deleteTransaction: transactions.deleteTransaction,
+  getDistinctCategories: dashboard.getDistinctCategories,
+  getDistinctMerchants: dashboard.getDistinctMerchants,
 };

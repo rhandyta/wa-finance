@@ -114,15 +114,17 @@ function createApp({ apiKey } = {}) {
     }),
   );
 
+  // Global rate limit: 200 requests per minute
   app.use(
     rateLimit({
       windowMs: 60 * 1000,
-      limit: 120,
+      limit: 200,
       standardHeaders: true,
       legacyHeaders: false,
     }),
   );
 
+  // Auth endpoints: stricter limit (10 per minute)
   app.use(
     '/api/auth',
     rateLimit({
@@ -133,16 +135,18 @@ function createApp({ apiKey } = {}) {
     }),
   );
 
+  // API endpoints: 100 requests per minute (dashboard makes multiple parallel calls)
   app.use(
     '/api',
     rateLimit({
       windowMs: 60 * 1000,
-      limit: 30,
+      limit: 100,
       standardHeaders: true,
       legacyHeaders: false,
     }),
   );
 
+  // Import endpoints: stricter limit (5 per minute)
   app.use(
     '/api/import',
     rateLimit({

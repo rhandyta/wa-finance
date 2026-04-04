@@ -208,6 +208,11 @@ async function listTransactions(
   await ensureSchema();
   const lim = clampInt(limit, 1, 100, 20);
   const off = clampInt(offset, 0, 1_000_000, 0);
+  console.log('listTransactions params:', { limit, offset, lim, off, startDate, endDate, type, category, merchant, q, includeItems });
+  // Ensure accountId is valid
+  if (!Number.isFinite(accountId) || accountId <= 0) {
+    throw new Error('account_id invalid');
+  }
   const t = normalizeType(type);
   const where = ['t.account_id = ?'];
   const params = [accountId];
@@ -242,6 +247,7 @@ async function listTransactions(
   }
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  console.log('listTransactions debug:', { whereSql, params, lim, off, joinItems });
   const [countRows] = await pool.execute(
     `SELECT COUNT(DISTINCT t.id) AS cnt FROM transactions t ${joinItems} ${whereSql}`,
     params,
@@ -321,6 +327,10 @@ async function listAuditLogs(accountId, { startDate, endDate, action, limit, off
   await ensureSchema();
   const lim = clampInt(limit, 1, 200, 50);
   const off = clampInt(offset, 0, 1_000_000, 0);
+  // Ensure accountId is valid
+  if (!Number.isFinite(accountId) || accountId <= 0) {
+    throw new Error('account_id invalid');
+  }
   const where = ['account_id = ?'];
   const params = [accountId];
 
@@ -353,6 +363,24 @@ async function listAuditLogs(accountId, { startDate, endDate, action, limit, off
   return { total, limit: lim, offset: off, rows };
 }
 
+async function getDistinctCategories(accountId) {
+  await ensureSchema();
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT category FROM transactions WHERE account_id = ? ORDER BY category ASC`,
+    [accountId],
+  );
+  return rows.map((r) => r.category);
+}
+
+async function getDistinctMerchants(accountId) {
+  await ensureSchema();
+  const [rows] = await pool.execute(
+    `SELECT DISTINCT merchant FROM transactions WHERE account_id = ? AND merchant IS NOT NULL AND merchant != '' ORDER BY merchant ASC`,
+    [accountId],
+  );
+  return rows.map((r) => r.merchant).filter(Boolean);
+}
+
 module.exports = {
   getSummary,
   getTimeSeries,
@@ -362,6 +390,8 @@ module.exports = {
   listTransactions,
   getTransactionDetail,
   listAuditLogs,
+  getDistinctCategories,
+  getDistinctMerchants,
   yyyymm,
 };
 

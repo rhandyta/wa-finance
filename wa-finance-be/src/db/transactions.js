@@ -624,6 +624,184 @@ async function detachOldReceipts(retentionDays) {
   return rows.map((r) => ({ id: r.id, account_id: r.account_id, receipt_path: r.receipt_path }));
 }
 
+async function createTransactionWithItems(accountId, txData, items = [], actorUserId = null) {
+  await ensureSchema();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const {
+      transaction_date,
+      type,
+      amount,
+      currency = 'IDR',
+      category,
+      merchant = null,
+      description = null,
+    } = txData;
+
+    const [mainResult] = await connection.execute(
+      `INSERT INTO transactions (account_id, transaction_date, type, amount, currency, category, merchant, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [accountId, transaction_date, type, amount, currency, category, merchant, description],
+    );
+    const transactionId = mainResult.insertId;
+
+    if (items && items.length > 0) {
+      const itemValues = items.map((item) => [
+        transactionId,
+        item.item_name,
+        item.quantity || 1,
+        item.price,
+      ]);
+      await connection.query(
+        `INSERT INTO transaction_items (transaction_id, item_name, quantity, price) VALUES ?`,
+        [itemValues],
+      );
+    }
+
+    await connection.commit();
+    await logAudit(accountId, actorUserId, 'transaction_create_api', 'transaction', String(transactionId), {
+      transaction_date,
+      type,
+      amount,
+      currency,
+      category,
+      merchant,
+    });
+    return transactionId;
+  } catch (error) {
+    await connection.rollback();
+    throw new Error('Failed to create transaction: ' + error.message);
+  } finally {
+    connection.release();
+  }
+}
+
+async function updateTransactionWithItems(accountId, transactionId, txData, items = null, actorUserId = null) {
+  await ensureSchema();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // Check if transaction exists and belongs to account
+    const [existing] = await connection.execute(
+      `SELECT id FROM transactions WHERE id = ? AND account_id = ?`,
+      [transactionId, accountId],
+    );
+    if (existing.length === 0) throw new Error('Transaction not found');
+
+    const allowedFields = ['transaction_date', 'type', 'amount', 'currency', 'category', 'merchant', 'description'];
+    const setClauses = [];
+    const values = [];
+
+    for (const [key, value] of Object.entries(txData)) {
+      if (allowedFields.includes(key) && value !== undefined) {
+        setClauses.push(`${key} = ?`);
+        values.push(value);
+      }
+    }
+
+    if (setClauses.length > 0) {
+      values.push(transactionId);
+      values.push(accountId);
+      const sql = `UPDATE transactions SET ${setClauses.join(', ')} WHERE id = ? AND account_id = ?`;
+      await connection.execute(sql, values);
+    }
+
+    // If items provided, replace all items
+    if (items !== null) {
+      await connection.execute(`DELETE FROM transaction_items WHERE transaction_id = ?`, [transactionId]);
+      if (items.length > 0) {
+        const itemValues = items.map((item) => [
+          transactionId,
+          item.item_name,
+          item.quantity || 1,
+          item.price,
+        ]);
+        await connection.query(
+          `INSERT INTO transaction_items (transaction_id, item_name, quantity, price) VALUES ?`,
+          [itemValues],
+        );
+      }
+    }
+
+    await connection.commit();
+    await logAudit(accountId, actorUserId, 'transaction_update_api', 'transaction', String(transactionId), txData);
+    return transactionId;
+  } catch (error) {
+    await connection.rollback();
+    throw new Error('Failed to update transaction: ' + error.message);
+  } finally {
+    connection.release();
+  }
+}
+
+async function deleteTransaction(accountId, transactionId, actorUserId = null) {
+  await ensureSchema();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(
+      `SELECT id, transaction_date, type, amount, currency, category, merchant, description, receipt_path, receipt_hash, text_hash, fingerprint_hash
+       FROM transactions WHERE id = ? AND account_id = ?`,
+      [transactionId, accountId],
+    );
+    if (rows.length === 0) throw new Error('Transaction not found');
+    const tx = rows[0];
+
+    // Get items
+    const [items] = await connection.execute(
+      `SELECT item_name, quantity, price FROM transaction_items WHERE transaction_id = ?`,
+      [transactionId],
+    );
+
+    // Save to deleted
+    const [deletedResult] = await connection.execute(
+      `INSERT INTO deleted_transactions (original_transaction_id, account_id, deleted_by_user_id, transaction_date, type, amount, currency, category, merchant, description, receipt_path, receipt_hash, text_hash, fingerprint_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        transactionId,
+        accountId,
+        actorUserId,
+        tx.transaction_date,
+        tx.type,
+        tx.amount,
+        tx.currency,
+        tx.category,
+        tx.merchant,
+        tx.description,
+        tx.receipt_path,
+        tx.receipt_hash,
+        tx.text_hash,
+        tx.fingerprint_hash,
+      ],
+    );
+    const deletedId = deletedResult.insertId;
+    if (items.length > 0) {
+      const values = items.map((it) => [deletedId, it.item_name, it.quantity, it.price]);
+      await connection.query(
+        `INSERT INTO deleted_transaction_items (deleted_transaction_id, item_name, quantity, price) VALUES ?`,
+        [values],
+      );
+    }
+
+    // Delete original
+    await connection.execute(`DELETE FROM transaction_items WHERE transaction_id = ?`, [transactionId]);
+    await connection.execute(`DELETE FROM transactions WHERE id = ? AND account_id = ?`, [transactionId, accountId]);
+
+    await connection.commit();
+    await logAudit(accountId, actorUserId, 'transaction_delete_api', 'transaction', String(transactionId), {});
+    return { deleted: true, originalId: transactionId };
+  } catch (error) {
+    await connection.rollback();
+    throw new Error('Failed to delete transaction: ' + error.message);
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   insertTransaction,
   getTransactions,
@@ -641,4 +819,7 @@ module.exports = {
   getSummaryTotals,
   tryMarkSummaryNotification,
   detachOldReceipts,
+  createTransactionWithItems,
+  updateTransactionWithItems,
+  deleteTransaction,
 };

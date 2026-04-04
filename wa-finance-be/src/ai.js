@@ -1,10 +1,10 @@
 const { OpenAI } = require('openai');
 const config = require('./config');
 const crypto = require('crypto');
-const LRU = require('lru-cache');
+const { LRUCache } = require('lru-cache');
 const { inc, time } = require('./metrics');
 
-const aiCache = new LRU({
+const aiCache = new LRUCache({
   max: 1000,
   ttl: 86400 * 1000, // 24 hours in milliseconds
 });

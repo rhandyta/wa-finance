@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+.env
+*.md
+Dockerfile
+.dockerignore
+.wwebjs_auth
+.wwebjs_cache
+public/uploads
+coverage
+.nyc_output

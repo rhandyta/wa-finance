@@ -109,6 +109,16 @@ Saat bot aktif, scan QR code di terminal menggunakan WhatsApp → Linked Devices
 - **Foto struk** (OCR otomatis) atau foto + caption
 - **Preview & konfirmasi** sebelum simpan (bisa koreksi field)
 
+### 🖥️ Dashboard Web (Enhanced)
+- **Ringkasan keuangan** — Pemasukan, pengeluaran, net, saving rate
+- **Daftar transaksi** — Pagination, filter (tanggal, tipe, kategori, merchant), dan pencarian
+- **Detail transaksi** — Lihat item transaksi, edit, dan hapus
+- **Tambah transaksi** — Form lengkap dengan dropdown kategori/merchant
+- **Grafik keuangan** — Visualisasi timeseries (minggu/bulan/tahun)
+- **Log audit** — Riwayat aktivitas dengan detail expandable
+- **Budget status** — Monitoring budget per kategori
+- Login via OTP WhatsApp (nomor HP + token akun)
+
 ### 📊 Laporan & Export
 - Laporan interaktif (list/buttons jika didukung)
 - Export CSV ringkas/detail, range custom
@@ -124,10 +134,6 @@ Saat bot aktif, scan QR code di terminal menggunakan WhatsApp → Linked Devices
 - Akun terpisah (`accounts` + `account_members`)
 - Token monitoring (read-only), invite viewer/editor
 - Manajemen akses
-
-### 🖥️ Dashboard Web
-- Ringkasan, timeseries, top kategori/merchant, budget status
-- Login via OTP WhatsApp (nomor HP + token akun)
 
 ### 🔧 Operasional
 - Healthcheck `/health`, metrics `/metrics`
@@ -214,7 +220,7 @@ Server default: `http://localhost:3000`
 | `POST` | `/api/auth/request-otp` | `{ phone, token }` |
 | `POST` | `/api/auth/verify-otp` | `{ phone, token, otp }` → `{ sessionToken, currency }` |
 
-### Dashboard  
+### Dashboard
 Auth: `Authorization: Bearer <sessionToken>`
 
 | Method | Path | Query Params |
@@ -224,13 +230,39 @@ Auth: `Authorization: Bearer <sessionToken>`
 | `GET` | `/api/dashboard/by-category` | `start`, `end`, `type`, `limit`, `currency` |
 | `GET` | `/api/dashboard/by-merchant` | `start`, `end`, `type`, `limit`, `currency` |
 | `GET` | `/api/dashboard/budget-status` | `month`, `currency` |
+| `GET` | `/api/dashboard/categories` | — (list kategori) |
+| `GET` | `/api/dashboard/merchants` | — (list merchant) |
 
-### Transaksi & Audit
+### Transaksi (CRUD)
+
+| Method | Path | Keterangan |
+|--------|------|------------|
+| `GET` | `/api/transactions` | List transaksi (dengan pagination & filter) |
+| `GET` | `/api/transactions/:id` | Detail transaksi |
+| `POST` | `/api/transactions` | Buat transaksi baru |
+| `PUT` | `/api/transactions/:id` | Update transaksi |
+| `DELETE` | `/api/transactions/:id` | Hapus transaksi (soft delete) |
+
+**Body POST/PUT `/api/transactions`:**
+```json
+{
+  "transaction_date": "2024-01-15",
+  "type": "OUT",
+  "amount": 50000,
+  "currency": "IDR",
+  "category": "Makanan",
+  "merchant": "Warung Pak Budi",
+  "description": "Makan siang",
+  "items": [
+    { "item_name": "Nasi Goreng", "quantity": 1, "price": 25000 }
+  ]
+}
+```
+
+### Audit & Import
 
 | Method | Path | Query Params |
 |--------|------|--------------|
-| `GET` | `/api/transactions` | `start`, `end`, `type`, `category`, `merchant`, `q`, `limit`, `offset`, `includeItems` |
-| `GET` | `/api/transactions/:id` | — |
 | `GET` | `/api/audit` | `start`, `end`, `action`, `limit`, `offset` |
 | `POST` | `/api/import/statement` | Body: `{ csv, dryRun }` |
 
@@ -244,6 +276,18 @@ Auth: `Authorization: Bearer <sessionToken>`
 4. Klik **Verifikasi & Masuk**
 
 > Token akun didapat dari bot WhatsApp: kirim `token` (khusus owner).
+
+### Fitur Dashboard Web
+
+| Fitur | Keterangan |
+|-------|------------|
+| **📊 Dashboard** | Ringkasan keuangan, top kategori, top merchant, budget status |
+| **💳 Transaksi** | Daftar transaksi dengan filter, pencarian, dan pagination |
+| **➕ Tambah** | Form tambah transaksi baru dengan dropdown kategori/merchant |
+| **📈 Grafik** | Visualisasi pemasukan/pengeluaran (minggu/bulan/tahun) |
+| **📋 Audit** | Log aktivitas dengan detail expandable |
+
+Navigasi menggunakan bottom tab bar dengan tombol FAB (+) untuk tambah transaksi cepat.
 
 ---
 
